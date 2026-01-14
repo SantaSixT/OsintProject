@@ -16,6 +16,12 @@
     "category": "social",
     "selectors": { "bio": "meta[property='og:description']", "image": "meta[property='og:image']" }
   },
+  "YouTube": {
+    "url": "https://www.youtube.com/@{}",
+    "errorType": "status_code",
+    "category": "video",
+    "selectors": { "bio": "meta[name='description']", "image": "meta[property='og:image']" }
+  },
   "Facebook": {
     "url": "https://www.facebook.com/{}",
     "errorType": "message",

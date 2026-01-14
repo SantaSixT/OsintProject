@@ -5,7 +5,8 @@ import unidecode
 
 BLACKLIST_DOMAINS = [
     "microsoft.com", "office.com", "wikipedia.org", 
-    "baidu.com", "zhihu.com", "adobe.com", "amazon.com"
+    "baidu.com", "zhihu.com", "adobe.com", "amazon.com",
+    "google.com", "apple.com"
 ]
 
 def normalize(text):
@@ -14,40 +15,53 @@ def normalize(text):
 
 def google_dorking(target_identity, email_mode=False):
     """
-    Si email_mode=True, target_identity est une liste d'emails à vérifier.
-    Sinon, c'est le nom de la personne.
+    email_mode=True : Active le mode 'Pwned' (recherche de fuites)
+    email_mode=False : Recherche de profils classiques
     """
     results = []
     queries = []
 
-    # --- MODE 1 : RECHERCHE DE MAILS (Nouveau !) ---
+    # --- MODE PWNED (Fuites d'emails) ---
     if email_mode:
-        # On cherche si ces emails apparaissent dans des leaks ou des profils
-        # target_identity est ici une liste d'emails
-        for email in target_identity:
-            queries.append(f'"{email}"') # Recherche exacte de l'email
-            queries.append(f'site:pastebin.com "{email}"') # Recherche dans les leaks
+        # target_identity est ici une liste d'emails générés
+        print(f"[*] Démarrage Check 'Pwned' pour {len(target_identity)} adresses...")
         
-        print(f"[*] Démarrage Radar Email pour {len(target_identity)} adresses...")
+        # Pour éviter de spammer DDG, on ne teste que les 10 plus probables
+        # (Gmail/Outlook/Orange en priorité)
+        priority_emails = [e for e in target_identity if "gmail" in e or "outlook" in e or "orange" in e or "yahoo" in e]
+        # On complète si besoin jusqu'à 8 emails max pour le scan
+        scan_list = priority_emails[:8]
+        if len(scan_list) < 8:
+            scan_list.extend(target_identity[:8-len(scan_list)])
+            
+        for email in list(set(scan_list)):
+            # 1. Recherche brute de l'email
+            queries.append(f'"{email}"') 
+            
+            # 2. Recherche spécifique "Leak" (Fichiers textes, Pastebin...)
+            # On cherche l'email à côté du mot "password" ou dans des fichiers txt
+            queries.append(f'"{email}" AND (password OR passwd OR dump OR leak)')
+            queries.append(f'site:pastebin.com "{email}"')
+            queries.append(f'ext:txt "{email}"')
 
-    # --- MODE 2 : RECHERCHE DE PERSONNE (Classique) ---
+    # --- MODE CLASSIQUE (Profils) ---
     else:
         target_identity = target_identity.strip()
-        social_sites = ["linkedin.com/in", "facebook.com", "twitter.com", "instagram.com", "tiktok.com"]
+        print(f"[*] Démarrage Radar Identité pour : '{target_identity}'")
+        
+        social_sites = ["linkedin.com/in", "facebook.com", "twitter.com", "instagram.com", "tiktok.com", "youtube.com"]
         for site in social_sites:
             queries.append(f'site:{site} "{target_identity}"')
         
-        queries.append(f'"{target_identity}"') # Recherche large
-        queries.append(f'"{target_identity}" filetype:pdf') # Docs
-        
-        print(f"[*] Démarrage Radar Identité pour : '{target_identity}'")
+        queries.append(f'"{target_identity}"')
+        queries.append(f'"{target_identity}" filetype:pdf')
 
     try:
         with DDGS() as ddgs:
             for query in queries:
                 try:
-                    # Max 3 résultats pour aller vite
-                    ddg_gen = ddgs.text(query, region='fr-fr', max_results=3)
+                    # On lance la recherche
+                    ddg_gen = ddgs.text(query, region='fr-fr', max_results=2)
                     
                     if not ddg_gen: continue
 
@@ -56,47 +70,43 @@ def google_dorking(target_identity, email_mode=False):
                         title = r.get('title', 'N/A')
                         snippet = r.get('body', '')
 
-                        # 1. FILTRE ANTI-SPAM (Blacklist)
-                        if any(blocked in link for blocked in BLACKLIST_DOMAINS):
-                            continue
+                        # FILTRES
+                        if any(blocked in link for blocked in BLACKLIST_DOMAINS): continue
 
-                        # 2. FILTRE DE PERTINENCE (Seulement pour les noms, pas les emails)
+                        # Si mode identité, on vérifie que le nom est bien là
                         if not email_mode:
                             flat_target = normalize(target_identity)
                             flat_content = normalize(title + " " + snippet + " " + link)
                             parts = flat_target.split()
-                            
-                            # Si on a "Prénom Nom"
                             if len(parts) >= 2:
-                                lastname = parts[-1]
-                                firstname = parts[0]
-                                # On exige le NOM DE FAMILLE + (Prénom OU Initiale)
-                                # Ex: "Rohrbasser" ET ("Antoine" OU "A")
-                                condition_nom = lastname in flat_content
-                                condition_prenom = (firstname in flat_content) or (f" {firstname[0]} " in flat_content)
-                                
-                                if not (condition_nom and condition_prenom):
-                                    continue
+                                # Vérif nom de famille obligatoire + prénom/initiale
+                                if parts[-1] not in flat_content: continue
                             elif flat_target not in flat_content:
                                 continue
 
-                        # Si on arrive ici, c'est validé !
-                        cat = "mail-leak" if email_mode else "hors-piste"
-                        if "linkedin" in link: cat = "social"
-                        
+                        # Définition de la catégorie
+                        cat = "hors-piste"
+                        if email_mode:
+                            cat = "mail-leak" # C'est une fuite potentielle !
+                            # Si on voit "password" dans l'extrait, c'est critique
+                            if "password" in snippet.lower() or "leak" in snippet.lower():
+                                cat = "CRITICAL_LEAK"
+                        elif "linkedin" in link or "facebook" in link or "twitter" in link:
+                            cat = "social"
+
                         results.append({
                             "site": "DuckDuckGo",
                             "username": query.replace('"', '').replace('site:pastebin.com ', ''),
                             "url": link,
                             "category": cat,
                             "metadata": {
-                                "Info": "Trouvé via Radar",
+                                "Info": "⚠️ Trace de fuite" if cat == "CRITICAL_LEAK" else "Radar Web",
                                 "Titre": title[:80],
                                 "Extrait": snippet[:100] + "..."
                             }
                         })
                     
-                    time.sleep(random.uniform(0.5, 1.0))
+                    time.sleep(random.uniform(0.5, 1.2))
 
                 except Exception: continue
 
