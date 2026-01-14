@@ -3,132 +3,111 @@ from bs4 import BeautifulSoup
 import time
 import random
 import threading
+import json
+import argparse
+import sys
+import os
 
-class OsintTracker:
-    def __init__(self, username):
+# --- CONFIGURATION & CONSTANTES ---
+BANNER = """
+   ________                  __  
+  /  _____/  __ __   ______ /  |_ 
+ /   \  ___ |  |  \ /  ___/|   __\\
+ \    \_\  \|  |  / \___ \ |  |  
+  \______  /|____/ /____  >|__|  
+         \/             \/       
+  v3.0 - OSINT Swiss Army Knife
+"""
+
+class GhostTracker:
+    def __init__(self, username, sites_file="sites.json"):
         self.username = username
-        self.results = {}
-        # Verrou pour éviter que les messages se mélangent dans la console
+        self.results = []
         self.print_lock = threading.Lock()
+        self.sites = self.load_sites(sites_file)
         
-        self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-            "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
-        ]
-
-        self.targets = {
-            "GitHub": {
-                "url": "https://github.com/{}",
-                "logic": "status_code"
-            },
-            "Wikipedia": { # Wikipedia User Page
-                "url": "https://en.wikipedia.org/wiki/User:{}",
-                "logic": "status_code"
-            },
-            "Reddit": {
-                "url": "https://www.reddit.com/user/{}",
-                "logic": "status_code"
-            },
-            "Medium": {
-                "url": "https://medium.com/@{}",
-                "logic": "status_code"
-            },
-             "Pastebin": {
-                "url": "https://pastebin.com/u/{}",
-                "logic": "status_code"
-            },
-             "DockerHub": {
-                "url": "https://hub.docker.com/u/{}",
-                "logic": "status_code"
-            }
-        }
-
-    def get_stealth_headers(self):
-        """Retourne des headers HTTP complets pour contourner les WAF basiques"""
-        ua = random.choice(self.user_agents)
-        return {
-            "User-Agent": ua,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        # Headers furtifs
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Referer": "https://www.google.com/", # On fait croire qu'on vient de Google
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "cross-site",
-            "Pragma": "no-cache",
-            "Cache-Control": "no-cache"
         }
 
-    def check_site(self, site, data):
-        url = data["url"].format(self.username)
-        headers = self.get_stealth_headers()
+    def load_sites(self, filepath):
+        """Charge la base de données des sites depuis le JSON"""
+        if not os.path.exists(filepath):
+            print(f"[!] Erreur : Fichier {filepath} introuvable.")
+            sys.exit(1)
+        try:
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print(f"[!] Erreur : Format JSON invalide dans {filepath}.")
+            sys.exit(1)
+
+    def check_site(self, site_name, site_data):
+        url = site_data["url"].format(self.username)
         
         try:
-            # Timeout augmenté à 10s
-            response = requests.get(url, headers=headers, timeout=10)
-            
-            exists = False
-            
-            if data["logic"] == "status_code":
+            response = requests.get(url, headers=self.headers, timeout=10)
+            found = False
+
+            # Logique 1 : Basée sur le code HTTP (404 = pas trouvé)
+            if site_data.get("errorType") == "status_code":
                 if response.status_code == 200:
-                    exists = True
-                elif response.status_code == 404:
-                    exists = False
-                elif response.status_code == 403:
-                    with self.print_lock:
-                        print(f"[!] {site} : Bloqué (403 WAF/Anti-Bot) - Essai manuel recommandé")
-                    return
-                else:
-                    return
+                    found = True
+            
+            # Logique 2 : Basée sur un message d'erreur dans le texte (pour les soft 404)
+            elif site_data.get("errorType") == "message":
+                if response.status_code == 200:
+                    error_msg = site_data.get("errorMsg")
+                    if error_msg not in response.text:
+                        found = True
 
-            if exists and "check_text" in data:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                if data["check_text"] in soup.get_text():
-                    exists = False 
-
-            if exists:
-                info = self.extract_details(response)
-                # Utilisation du Lock pour un affichage propre
+            if found:
                 with self.print_lock:
-                    print(f"[+] TROUVÉ : {site} -> {url}")
-                    if info:
-                        print(f"    └── Info: {info}")
-                    self.results[site] = url
-
-        except requests.exceptions.Timeout:
-            with self.print_lock:
-                print(f"[!] {site} : Timeout (Trop lent)")
-        except requests.exceptions.RequestException as e:
-            pass # On ignore les autres erreurs pour garder la sortie propre
-
-    def extract_details(self, response):
-        try:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            title = soup.title.string.strip() if soup.title else ""
-            # Nettoyage basique du titre (supprime les retours à la ligne)
-            return " ".join(title.split())[:60] + "..."
-        except:
-            return None
+                    print(f"[+] FOUND: {site_name:<15} -> {url}")
+                self.results.append({"site": site_name, "url": url, "status": "FOUND"})
+        
+        except Exception:
+            pass # Silence is golden in CLI tools
 
     def run(self):
-        print(f"--- Démarrage du scan OSINT (Stealth Mode) pour : {self.username} ---")
+        print(f"[*] Analyse du profil : {self.username}")
+        print(f"[*] Sites chargés : {len(self.sites)}")
         
         threads = []
-        for site, data in self.targets.items():
-            t = threading.Thread(target=self.check_site, args=(site, data))
+        for site_name, site_data in self.sites.items():
+            t = threading.Thread(target=self.check_site, args=(site_name, site_data))
             threads.append(t)
             t.start()
-            time.sleep(random.uniform(0.2, 0.6)) # Pause un peu plus longue
+            time.sleep(0.05) # Petit délai pour éviter le flood
 
         for t in threads:
             t.join()
-            
-        print(f"\n--- Scan terminé. {len(self.results)} profils trouvés. ---")
 
+    def save_report(self, filename):
+        """Exporte les résultats en JSON"""
+        with open(filename, 'w') as f:
+            json.dump(self.results, f, indent=4)
+        print(f"\n[V] Rapport sauvegardé dans : {filename}")
+
+# --- MAIN ---
 if __name__ == "__main__":
-    target_pseudo = input("Entrez le pseudo à traquer : ")
-    tracker = OsintTracker(target_pseudo)
+    print(BANNER)
+    
+    # Gestion des arguments CLI (Le standard pro)
+    parser = argparse.ArgumentParser(description="Outil OSINT de recherche de pseudos.")
+    parser.add_argument("-u", "--username", required=True, help="Le pseudo à rechercher")
+    parser.add_argument("-o", "--output", help="Nom du fichier pour sauvegarder le rapport (ex: report.json)")
+    parser.add_argument("-d", "--database", default="sites.json", help="Fichier JSON des sites cibles")
+    
+    args = parser.parse_args()
+
+    tracker = GhostTracker(args.username, args.database)
     tracker.run()
+    
+    if args.output:
+        tracker.save_report(args.output)
+    else:
+        print("\n[*] Terminé. Utilisez -o pour sauvegarder.")

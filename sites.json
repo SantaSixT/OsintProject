@@ -1,0 +1,23 @@
+{
+  "GitHub": {
+    "url": "https://github.com/{}",
+    "errorType": "status_code",
+    "category": "coding"
+  },
+  "Instagram": {
+    "url": "https://www.instagram.com/{}/",
+    "errorType": "message",
+    "errorMsg": "Sorry, this page isn't available.",
+    "category": "social"
+  },
+  "Twitter": {
+    "url": "https://twitter.com/{}",
+    "errorType": "status_code",
+    "category": "social"
+  },
+  "Pastebin": {
+    "url": "https://pastebin.com/u/{}",
+    "errorType": "status_code",
+    "category": "leak"
+  }
+}
