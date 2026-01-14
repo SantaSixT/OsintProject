@@ -2,7 +2,9 @@ requests
 beautifulsoup4
 streamlit
 unidecode
-googlesearch-python
+duckduckgo-search
 pandas
 folium
 streamlit-folium
+folium
+geopy

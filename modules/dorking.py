@@ -1,48 +1,58 @@
-from googlesearch import search
+from duckduckgo_search import DDGS
 import time
 import random
 
 def google_dorking(target_identity, max_results=5):
     """
-    Effectue des recherches Google avancées pour trouver des traces hors réseaux sociaux.
+    Effectue des recherches via DuckDuckGo (plus permissif que Google)
+    pour trouver des traces hors réseaux sociaux.
     """
     results = []
     
-    # Stratégies de recherche (Dorks)
+    # Stratégies de recherche (Dorks) adaptées pour DuckDuckGo
+    # Note : DDG supporte très bien site:, filetype:, etc.
     queries = [
-        # Recherche exacte du nom sur le web
-        f'"{target_identity}"',
-        
-        # Recherche de fichiers PDF/DOC oubliés (CV, Documents)
-        f'"{target_identity}" filetype:pdf OR filetype:docx',
-        
-        # Recherche dans les URL (blogs perso, sous-domaines)
-        f'inurl:"{target_identity.replace(" ", "")}"',
-        
-        # Recherche de mentions sur des sites de paste (fuites de données)
-        f'site:pastebin.com "{target_identity}"'
+        f'site:linkedin.com/in/ "{target_identity}"',
+        f'site:twitter.com "{target_identity}"',
+        f'"{target_identity}" filetype:pdf',
+        f'site:pastebin.com "{target_identity}"',
+        f'inurl:"{target_identity.replace(" ", "")}"' # Recherche dans les URL
     ]
     
-    print(f"[*] Démarrage Google Dorking pour : {target_identity}")
+    print(f"[*] Démarrage Radar (DuckDuckGo) pour : {target_identity}")
     
-    for query in queries:
-        try:
-            # On demande à Google
-            # pause=2.0 est vital pour ne pas se faire bannir l'IP par Google (429 Too Many Requests)
-            for url in search(query, num_results=max_results, lang="fr", sleep_interval=2):
-                results.append({
-                    "site": "Google Dork",
-                    "username": query, # On stocke la requête qui a fonctionné
-                    "url": url,
-                    "category": "hors-piste",
-                    "metadata": {"Info": "Trouvé via Google Search"}
-                })
-                # Petite pause aléatoire supplémentaire par sécurité
-                time.sleep(random.uniform(1, 3))
+    # On utilise un gestionnaire de contexte pour DDGS
+    with DDGS() as ddgs:
+        for query in queries:
+            try:
+                # DDGS est simple : on itère sur les résultats
+                # region="fr-fr" permet de cibler la France
+                ddg_gen = ddgs.text(query, region='fr-fr', max_results=max_results)
                 
-        except Exception as e:
-            # Si Google bloque (Rate Limit), on arrête ce module mais on ne plante pas l'app
-            print(f"[!] Erreur Google : {e}")
-            break
+                for r in ddg_gen:
+                    title = r.get('title', 'N/A')
+                    link = r.get('href', '')
+                    snippet = r.get('body', '')
+
+                    # On ajoute au rapport uniquement si on a un lien
+                    if link:
+                        results.append({
+                            "site": "DuckDuckGo", # On note la source
+                            "username": query,    # La requête utilisée
+                            "url": link,
+                            "category": "hors-piste",
+                            "metadata": {
+                                "Titre": title[:50] + "...", 
+                                "Extrait": snippet[:100] + "..."
+                            }
+                        })
+                
+                # Petite pause pour être poli (Good OpSec)
+                time.sleep(random.uniform(1, 2))
+                    
+            except Exception as e:
+                print(f"[!] Erreur DuckDuckGo sur '{query}': {e}")
+                # On continue quand même avec les autres requêtes
+                continue
             
     return results
