@@ -3,44 +3,22 @@
     "url": "https://github.com/{}",
     "errorType": "status_code",
     "category": "coding",
-    "selectors": {
-      "bio": "meta[name='description']",
-      "image": "meta[property='og:image']",
-      "location": "li[itemprop='homeLocation']"
-    }
+    "selectors": { "bio": "meta[name='description']", "image": "meta[property='og:image']" }
   },
   "Twitter": {
     "url": "https://twitter.com/{}",
     "errorType": "status_code",
     "category": "social",
-    "selectors": {
-      "bio": "meta[property='og:description']",
-      "image": "meta[property='og:image']"
-    }
-  },
-  "Reddit": {
-    "url": "https://www.reddit.com/user/{}",
-    "errorType": "status_code",
-    "category": "social",
-    "selectors": {
-      "bio": "meta[property='og:description']",
-      "image": "meta[property='og:image']"
-    }
+    "selectors": { "bio": "meta[property='og:description']", "image": "meta[property='og:image']" }
   },
   "DockerHub": {
     "url": "https://hub.docker.com/u/{}",
     "errorType": "status_code",
-    "category": "tech",
-    "selectors": {
-       "bio": "meta[name='description']"
-    }
+    "category": "tech"
   },
   "Pastebin": {
     "url": "https://pastebin.com/u/{}",
     "errorType": "status_code",
-    "category": "leaks",
-    "selectors": {
-      "image": "meta[property='og:image']"
-    }
+    "category": "leaks"
   }
 }
