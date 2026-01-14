@@ -3,22 +3,114 @@
     "url": "https://github.com/{}",
     "errorType": "status_code",
     "category": "coding",
-    "selectors": { "bio": "meta[name='description']", "image": "meta[property='og:image']" }
+    "selectors": { "bio": "meta[name='description']", "image": "meta[property='og:image']", "location": "li[itemprop='homeLocation']" }
   },
-  "Twitter": {
+  "GitLab": {
+    "url": "https://gitlab.com/{}",
+    "errorType": "status_code",
+    "category": "coding"
+  },
+  "Twitter (X)": {
     "url": "https://twitter.com/{}",
     "errorType": "status_code",
     "category": "social",
     "selectors": { "bio": "meta[property='og:description']", "image": "meta[property='og:image']" }
+  },
+  "Facebook": {
+    "url": "https://www.facebook.com/{}",
+    "errorType": "message",
+    "errorMsg": "ce contenu n'est pas disponible",
+    "category": "social"
+  },
+  "Instagram": {
+    "url": "https://www.instagram.com/{}/",
+    "errorType": "message",
+    "errorMsg": "n'est malheureusement pas disponible",
+    "category": "social"
+  },
+  "Reddit": {
+    "url": "https://www.reddit.com/user/{}",
+    "errorType": "message",
+    "errorMsg": "page not found",
+    "category": "social",
+    "selectors": { "bio": "meta[property='og:description']" }
+  },
+  "Pinterest": {
+    "url": "https://www.pinterest.com/{}/",
+    "errorType": "message",
+    "errorMsg": "Page not found",
+    "category": "social"
+  },
+  "Steam": {
+    "url": "https://steamcommunity.com/id/{}",
+    "errorType": "message",
+    "errorMsg": "The specified profile could not be found",
+    "category": "gaming",
+    "selectors": { "bio": "div.header_real_name", "image": "link[rel='image_src']", "location": "div.header_real_name" }
+  },
+  "Twitch": {
+    "url": "https://www.twitch.tv/{}",
+    "errorType": "message",
+    "errorMsg": "content is unavailable",
+    "category": "gaming",
+    "selectors": { "bio": "meta[property='og:description']" }
+  },
+  "Minecraft (NameMC)": {
+    "url": "https://fr.namemc.com/profile/{}",
+    "errorType": "message",
+    "errorMsg": "Statut: Disponible",
+    "category": "gaming"
+  },
+  "Roblox (Trade)": {
+    "url": "https://rblx.trade/p/{}",
+    "errorType": "status_code",
+    "category": "gaming"
+  },
+  "Spotify": {
+    "url": "https://open.spotify.com/user/{}",
+    "errorType": "status_code",
+    "category": "music"
+  },
+  "SoundCloud": {
+    "url": "https://soundcloud.com/{}",
+    "errorType": "status_code",
+    "category": "music"
+  },
+  "Telegram": {
+    "url": "https://t.me/{}",
+    "errorType": "message",
+    "errorMsg": "If you have Telegram, you can contact",
+    "category": "chat",
+    "selectors": { "bio": "div.tgme_page_description", "image": "meta[property='og:image']" }
+  },
+  "Discord (Bio)": {
+    "url": "https://discord.bio/p/{}",
+    "errorType": "status_code",
+    "category": "chat"
+  },
+  "Medium": {
+    "url": "https://medium.com/@{}",
+    "errorType": "status_code",
+    "category": "blog"
+  },
+  "Pastebin": {
+    "url": "https://pastebin.com/u/{}",
+    "errorType": "status_code",
+    "category": "leaks"
   },
   "DockerHub": {
     "url": "https://hub.docker.com/u/{}",
     "errorType": "status_code",
     "category": "tech"
   },
-  "Pastebin": {
-    "url": "https://pastebin.com/u/{}",
+  "Pypi (Python)": {
+    "url": "https://pypi.org/user/{}/",
     "errorType": "status_code",
-    "category": "leaks"
+    "category": "tech"
+  },
+  "NPM (JS)": {
+    "url": "https://www.npmjs.com/~{}",
+    "errorType": "status_code",
+    "category": "tech"
   }
 }
