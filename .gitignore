@@ -1,8 +1,17 @@
-venv/
+# Python & Venv
 __pycache__/
-*.log
-.DS_Store
-results/resultats/
+*.py[cod]
 venv/
-__pycache__/
 .env
+
+# MacOS / System
+.DS_Store
+
+# Projet OSINT - Données sensibles
+resultats/
+*.json
+*.csv
+*.log
+
+# Streamlit
+.streamlit/
