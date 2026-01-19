@@ -3,10 +3,12 @@ import time
 import random
 import unidecode
 
+# Liste noire des domaines "bruit de fond"
 BLACKLIST_DOMAINS = [
     "microsoft.com", "office.com", "wikipedia.org", 
     "baidu.com", "zhihu.com", "adobe.com", "amazon.com",
-    "google.com", "apple.com"
+    "google.com", "apple.com", "facebook.com/help", 
+    "support.google.com", "answers.microsoft.com"
 ]
 
 def normalize(text):
@@ -27,7 +29,6 @@ def google_dorking(target_identity, email_mode=False):
         print(f"[*] Démarrage Check 'Pwned' pour {len(target_identity)} adresses...")
         
         # Pour éviter de spammer DDG, on ne teste que les 10 plus probables
-        # (Gmail/Outlook/Orange en priorité)
         priority_emails = [e for e in target_identity if "gmail" in e or "outlook" in e or "orange" in e or "yahoo" in e]
         # On complète si besoin jusqu'à 8 emails max pour le scan
         scan_list = priority_emails[:8]
@@ -39,7 +40,6 @@ def google_dorking(target_identity, email_mode=False):
             queries.append(f'"{email}"') 
             
             # 2. Recherche spécifique "Leak" (Fichiers textes, Pastebin...)
-            # On cherche l'email à côté du mot "password" ou dans des fichiers txt
             queries.append(f'"{email}" AND (password OR passwd OR dump OR leak)')
             queries.append(f'site:pastebin.com "{email}"')
             queries.append(f'ext:txt "{email}"')
@@ -70,26 +70,44 @@ def google_dorking(target_identity, email_mode=False):
                         title = r.get('title', 'N/A')
                         snippet = r.get('body', '')
 
-                        # FILTRES
+                        # --- FILTRE 1 : BLACKLIST ---
                         if any(blocked in link for blocked in BLACKLIST_DOMAINS): continue
 
-                        # Si mode identité, on vérifie que le nom est bien là
-                        if not email_mode:
+                        # Normalisation pour l'analyse
+                        flat_content = normalize(title + " " + snippet + " " + link)
+
+                        # --- FILTRE 2 : VERIFICATION DE PERTINENCE ---
+                        
+                        # Cas A : Recherche d'Email (Mode Pwned)
+                        if email_mode:
+                            # On récupère l'email cherché depuis la requête (entre guillemets)
+                            # ex: query = '"jean.dupont@gmail.com" AND password' -> on veut jean.dupont@gmail.com
+                            target_email = ""
+                            if '"' in query:
+                                target_email = normalize(query.split('"')[1])
+                            
+                            # CORRECTIF : Si l'email n'apparaît pas CLAIREMENT dans le titre ou l'extrait, on jette.
+                            # Cela élimine les pages d'aide Facebook ou les forums génériques.
+                            if target_email and target_email not in flat_content:
+                                continue
+
+                        # Cas B : Recherche d'Identité (Mode Classique)
+                        else:
                             flat_target = normalize(target_identity)
-                            flat_content = normalize(title + " " + snippet + " " + link)
                             parts = flat_target.split()
+                            
                             if len(parts) >= 2:
                                 # Vérif nom de famille obligatoire + prénom/initiale
                                 if parts[-1] not in flat_content: continue
                             elif flat_target not in flat_content:
                                 continue
 
-                        # Définition de la catégorie
+                        # --- CLASSIFICATION ---
                         cat = "hors-piste"
                         if email_mode:
-                            cat = "mail-leak" # C'est une fuite potentielle !
+                            cat = "mail-leak"
                             # Si on voit "password" dans l'extrait, c'est critique
-                            if "password" in snippet.lower() or "leak" in snippet.lower():
+                            if "password" in snippet.lower() or "leak" in snippet.lower() or "db" in snippet.lower():
                                 cat = "CRITICAL_LEAK"
                         elif "linkedin" in link or "facebook" in link or "twitter" in link:
                             cat = "social"
